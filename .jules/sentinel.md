@@ -1,0 +1,4 @@
+## 2024-05-18 - Avoid Broad LIKE Clauses for DID Lookups
+**Vulnerability:** A `get_profile` database query used `WHERE did = $1 OR did LIKE '%:' || $1` for profile resolution. This allows DID spoofing because completely different DIDs that happen to share a suffix string will incorrectly match.
+**Learning:** The `%:` prefix wildcard match in SQL `LIKE` queries is too broad and can mistakenly resolve DIDs to an unintended row, leading to spoofing or denial of service where a user can hijack or occlude another user's profile resolution.
+**Prevention:** For resolving DIDs by their short IDs, use a specific SQL `CASE` clause and matching application logic to strictly isolate only the short DID ID portion from valid prefixes (e.g. `did:key:`) while leaving arbitrary DIDs intact. In `gitlawb`, this pattern uses `normalize_owner_key` in Rust and the `OWNER_KEY_CASE_SQL` in SQL.

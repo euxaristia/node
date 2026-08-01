@@ -899,6 +899,10 @@ pub(crate) fn normalize_owner_key(did: &str) -> &str {
 /// drift apart. If you change `normalize_owner_key`, update this const too.
 const OWNER_KEY_CASE_SQL: &str = "CASE WHEN owner_did LIKE 'did:key:%' AND position(':' in substr(owner_did, 9)) = 0 THEN substr(owner_did, 9) ELSE owner_did END";
 
+/// SQL CASE expression byte-identical to `normalize_owner_key`, but for columns
+/// named `did` (like in agent_profiles) instead of `owner_did`.
+const PROFILE_DID_CASE_SQL: &str = "CASE WHEN did LIKE 'did:key:%' AND position(':' in substr(did, 9)) = 0 THEN substr(did, 9) ELSE did END";
+
 #[cfg(test)]
 mod normalize_owner_key_tests {
     use super::normalize_owner_key;
@@ -3424,14 +3428,17 @@ impl Db {
     }
 
     pub async fn get_profile(&self, did: &str) -> Result<Option<ProfileRecord>> {
-        let row = sqlx::query(
+        let did_key = normalize_owner_key(did);
+        let sql = format!(
             "SELECT did, display_name, bio, avatar_url, website, socials, profile_cid, created_at, updated_at
              FROM agent_profiles
-             WHERE did = $1 OR did LIKE '%:' || $1",
-        )
-        .bind(did)
-        .fetch_optional(&self.pool)
-        .await?;
+             WHERE ({key}) = $1",
+             key = PROFILE_DID_CASE_SQL
+        );
+        let row = sqlx::query(&sql)
+            .bind(did_key)
+            .fetch_optional(&self.pool)
+            .await?;
 
         Ok(row.map(|r| ProfileRecord {
             did: r.get("did"),
