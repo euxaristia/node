@@ -3511,12 +3511,14 @@ impl Db {
     }
 
     pub async fn get_profile(&self, did: &str) -> Result<Option<ProfileRecord>> {
+        let escaped_did = did.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
         let row = sqlx::query(
             "SELECT did, display_name, bio, avatar_url, website, socials, profile_cid, created_at, updated_at
              FROM agent_profiles
-             WHERE did = $1 OR did LIKE '%:' || $1",
+             WHERE did = $1 OR did LIKE '%:' || $2 ESCAPE '\\'",
         )
         .bind(did)
+        .bind(&escaped_did)
         .fetch_optional(&self.pool)
         .await?;
 
