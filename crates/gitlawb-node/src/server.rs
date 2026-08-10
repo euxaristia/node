@@ -42,6 +42,34 @@ async fn graphql_playground() -> impl IntoResponse {
     ))
 }
 
+async fn add_security_headers(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let mut response = next.run(req).await;
+    let headers = response.headers_mut();
+
+    // Prevent MIME-sniffing
+    headers.insert(
+        axum::http::header::X_CONTENT_TYPE_OPTIONS,
+        axum::http::HeaderValue::from_static("nosniff"),
+    );
+
+    // Prevent Clickjacking
+    headers.insert(
+        axum::http::header::X_FRAME_OPTIONS,
+        axum::http::HeaderValue::from_static("DENY"),
+    );
+
+    // Basic CSP to prevent framing
+    headers.insert(
+        axum::http::header::CONTENT_SECURITY_POLICY,
+        axum::http::HeaderValue::from_static("frame-ancestors 'none'"),
+    );
+
+    response
+}
+
 /// Applies the standard auth middleware pair to a router: HTTP Signature verification
 /// followed by UCAN chain validation. The two layers run in this order for every
 /// matched request: `require_signature` first (sets `AuthenticatedDid`), then
@@ -479,6 +507,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(ipfs_routes)
         .merge(arweave_routes)
         .merge(meta_routes)
+        .layer(middleware::from_fn(add_security_headers))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &axum::http::Request<_>| {
