@@ -1,0 +1,4 @@
+## 2024-08-10 - [SQL Wildcard Injection in list_ref_certificates_by_prefix]
+**Vulnerability:** The `list_ref_certificates_by_prefix` function in `crates/gitlawb-node/src/db/mod.rs` was vulnerable to SQL wildcard injection. User-provided prefix input was concatenated directly into a `LIKE` clause with `%` appended, allowing an attacker to use `%`, `_`, or `\` to match broader sets of data.
+**Learning:** SQL `LIKE` queries using untrusted user input without proper escaping can bypass intended prefix or bounds matching logic and expose broader records in PostgreSQL when handled with standard binding approaches.
+**Prevention:** Ensure user input used in SQL `LIKE` clauses is explicitly escaped in application logic for wildcard characters (`%`, `_`, and `\`) and append the `ESCAPE '\'` specifier to the query string to prevent injection vulnerabilities.
