@@ -2107,7 +2107,10 @@ impl Db {
     ) -> Result<Vec<RefCertificate>> {
         let limit = limit.max(1);
         // Security (Sentinel): Escape LIKE wildcards to prevent injection/DoS
-        let escaped_prefix = prefix.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+        let escaped_prefix = prefix
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
         let pattern = format!("{}%", escaped_prefix);
         let rows = sqlx::query(
             "SELECT id, repo_id, ref_name, old_sha, new_sha, pusher_did, node_did, signature, issued_at
