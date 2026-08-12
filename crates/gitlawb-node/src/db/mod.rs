@@ -2106,10 +2106,15 @@ impl Db {
         limit: i64,
     ) -> Result<Vec<RefCertificate>> {
         let limit = limit.max(1);
-        let pattern = format!("{}%", prefix);
+        // Sentinel: Prevent LIKE injection by escaping wildcards in user input.
+        let escaped = prefix
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
+        let pattern = format!("{}%", escaped);
         let rows = sqlx::query(
             "SELECT id, repo_id, ref_name, old_sha, new_sha, pusher_did, node_did, signature, issued_at
-             FROM ref_certificates WHERE repo_id = $1 AND id LIKE $2 ORDER BY issued_at DESC LIMIT $3",
+             FROM ref_certificates WHERE repo_id = $1 AND id LIKE $2 ESCAPE '\\' ORDER BY issued_at DESC LIMIT $3",
         )
         .bind(repo_id)
         .bind(&pattern)
