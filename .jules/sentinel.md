@@ -1,0 +1,4 @@
+## 2024-08-13 - [Escape Wildcards in SQL LIKE Clauses]
+**Vulnerability:** SQL injection via unsanitized wildcard characters in user-provided `prefix` string used in a `LIKE` clause for `list_ref_certificates_by_prefix` (e.g. `pattern = format!("{}%", prefix)` without escaping `%` and `_`).
+**Learning:** `sqlx::query` does not automatically escape `%`, `_`, or `\` when binding string variables used in `LIKE` queries, allowing an attacker to bypass prefix-matching or manipulate the search space if they pass wildcard characters in the user input.
+**Prevention:** Always escape wildcard characters (`\`, `%`, `_`) in user-provided strings before appending a `LIKE` wildcard (e.g., `%`), or use a library utility function to escape wildcards for `LIKE` clauses. In Rust, you must be careful with escaping the `ESCAPE` clause correctly (e.g. `ESCAPE '\\'`).
