@@ -1,0 +1,4 @@
+## 2024-03-20 - [SQL Wildcard Injection in Prefix Queries]
+**Vulnerability:** User-provided prefixes were directly interpolated into SQL `LIKE` clauses without escaping wildcard characters (`%`, `_`, `\`). This allows users to perform unbounded wildcard searches, potentially causing denial of service (DoS) through expensive queries or matching unintended records.
+**Learning:** In Rust/`sqlx`, binding a parameter to a `LIKE` clause does not automatically escape wildcard characters within that parameter's string value.
+**Prevention:** Always sanitize user input intended for `LIKE` patterns by escaping `%`, `_`, and `\` (the default escape character, or a custom one if specified). When adding an `ESCAPE` clause to the SQL query, use the syntax `ESCAPE '\\'` (two backslashes in Rust string literals).
