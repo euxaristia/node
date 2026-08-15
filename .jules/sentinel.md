@@ -1,0 +1,4 @@
+## 2026-08-15 - [CRITICAL] Fix SQL injection in ref certificate query
+**Vulnerability:** SQL wildcard injection in `list_ref_certificates_by_prefix` due to unescaped user-provided `prefix` concatenated directly into a `LIKE` query pattern.
+**Learning:** `sqlx`'s `$X` binding parameterized strings correctly prevents standard SQL injections, but doesn't handle the escaping of `%` or `_` characters in Postgres `LIKE` clauses automatically. Using backslashes natively inside the literal like `ESCAPE '\'` is a syntax error since Postgres evaluates it to `ESCAPE ''`.
+**Prevention:** When using SQL `LIKE` clauses with user-provided data in `sqlx`, always escape wildcard characters (`%`, `_`, and `\`) in the Rust code using `.replace()`. When appending an `ESCAPE` clause to the SQL query, the correct Rust string literal syntax is `ESCAPE '\\'` (two backslashes) for proper evaluation in Postgres.
