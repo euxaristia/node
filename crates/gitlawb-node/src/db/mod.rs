@@ -2108,7 +2108,10 @@ impl Db {
         let limit = limit.max(1);
 
         // 🛡️ Sentinel: Sanitize wildcard characters in user input to prevent SQL LIKE injection.
-        let escaped_prefix = prefix.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+        let escaped_prefix = prefix
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
         let pattern = format!("{}%", escaped_prefix);
 
         let rows = sqlx::query(
