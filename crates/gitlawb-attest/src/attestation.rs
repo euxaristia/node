@@ -16,7 +16,7 @@
 //! by exact match.
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64U, Engine};
-use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::error::{Error, Result};
@@ -111,8 +111,7 @@ impl Attestation {
             .try_into()
             .map_err(|_| Error::Signature("signature must be 64 bytes".to_string()))?;
         let sig = Signature::from_bytes(&sig_bytes);
-        // Sentinel: Use verify_strict to prevent signature malleability (strict RFC 8032 compliance)
-        vk.verify_strict(&bytes, &sig)
+        vk.verify(&bytes, &sig)
             .map_err(|e| Error::Signature(format!("ed25519: {e}")))?;
 
         Ok(vk)
