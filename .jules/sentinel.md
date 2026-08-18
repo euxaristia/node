@@ -1,4 +1,0 @@
-## 2025-02-27 - [HIGH] Fix SQL wildcard injection in prefix matching
-**Vulnerability:** Found a SQL wildcard injection in `list_ref_certificates_by_prefix` where the user-provided `prefix` string was appended with `%` and directly bound into a `LIKE` clause. An attacker could pass `_` or `%` to broaden the search inadvertently.
-**Learning:** In PostgreSQL, the `LIKE` wildcard character matches need user input to be properly escaped so that literal percentages or underscores are not treated as operators. Rust's string literal behavior requires double backslashes for escaping the backslash.
-**Prevention:** Always escape wildcard characters (`\`, `%`, `_`) in user inputs used in `LIKE` queries, and use the `.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")` pattern along with an `ESCAPE '\\'` clause on the SQL side.
