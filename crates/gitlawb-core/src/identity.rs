@@ -78,10 +78,10 @@ impl Keypair {
 
 /// Verify an Ed25519 signature.
 pub fn verify(verifying_key: &VerifyingKey, msg: &[u8], sig_bytes: &[u8; 64]) -> Result<()> {
+    use ed25519_dalek::Verifier;
     let sig = Signature::from_bytes(sig_bytes);
-    // Sentinel: Use verify_strict to prevent signature malleability (RFC 8032 compliance)
     verifying_key
-        .verify_strict(msg, &sig)
+        .verify(msg, &sig)
         .map_err(|_| Error::SignatureInvalid)
 }
 
