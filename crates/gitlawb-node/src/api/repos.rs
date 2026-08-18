@@ -368,8 +368,9 @@ pub async fn list_repos(
         .map(|(r, stars)| to_response(&r, &state, stars))
         .collect();
     let mut response = Json(body).into_response();
+    // Header names must be lowercase string literals; uppercase letters panic axum's IntoHeaderName
     response.headers_mut().insert(
-        "X-Total-Count",
+        "x-total-count",
         HeaderValue::from_str(&total.to_string()).unwrap_or(HeaderValue::from_static("0")),
     );
     Ok(response)
