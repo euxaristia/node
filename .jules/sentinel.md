@@ -1,0 +1,4 @@
+## 2025-01-20 - Command Argument Injection in `std::process::Command`
+**Vulnerability:** When passing user-controlled paths (like `source_path` or `disk_path` which derive from `forker_did` and `fork_name`) to `git clone` using `Command::new("git").args(...)`, there's a risk of command argument injection if the paths start with a hyphen (`-`) and aren't prefixed with `--` to signal the end of options.
+**Learning:** `git clone` and other git commands interpret arguments starting with `-` as options. If a path begins with `-`, git might interpret it as a flag, leading to unexpected behavior or arbitrary command execution (e.g., via `--upload-pack`).
+**Prevention:** To prevent command argument injection when passing user-controlled paths to `std::process::Command` (e.g., for git), always prepend `--` before the paths to signal the end of options, or ensure the paths are absolute so they cannot be interpreted as flags.
