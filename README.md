@@ -144,6 +144,10 @@ Or build from source:
 cargo build --release -p gl -p git-remote-gitlawb -p gitlawb-node
 ```
 
+Node promisor mirrors use a 10 GiB blob filter on Unix. Git for Windows requires
+a filter below 4 GiB, so Windows mirrors use 4 GiB minus one byte; larger blobs
+remain available through on-demand fetching.
+
 Put these binaries on your `PATH`:
 
 ```txt
