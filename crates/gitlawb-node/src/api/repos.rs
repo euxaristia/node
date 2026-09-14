@@ -3942,12 +3942,12 @@ mod tests {
                     "git_timeout"
                 }
             );
-            assert!(state.git_read_semaphore.available_permits() > 0);
-            assert!(state.git_blob_semaphore.available_permits() > 0);
-            assert!(state
-                .git_read_per_caller
-                .try_acquire("203.0.113.31")
-                .is_some());
+            assert_eq!(state.git_read_semaphore.available_permits(), 64);
+            assert_eq!(
+                state.git_blob_semaphore.available_permits(),
+                MAX_CONCURRENT_BLOB_READS
+            );
+            assert_eq!(state.git_read_per_caller.tracked_keys(), 0);
         }
     }
 
