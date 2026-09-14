@@ -1439,21 +1439,22 @@ exit 1
         let td = tempfile::TempDir::new().unwrap();
         let bare = td.path().join("bare.git");
         std::fs::create_dir_all(bare.join("objects/pack")).unwrap();
-        let log = td.path().join("spawns.log");
+        let log = td.path().join("probe spawns.log");
+        let quoted_log = format!("'{}'", log.display().to_string().replace('\'', "'\"'\"'"));
         let fake = td.path().join("fakegit");
         std::fs::write(
             &fake,
             format!(
                 "#!/bin/sh\n\
-                 echo call >> {}\n\
+                 echo call >> {quoted_log}\n\
                  if [ \"$1\" = \"cat-file\" ] && [ \"$2\" = \"--batch-check\" ]; then \
                      read spec; \
-                     sleep 0.15; \
+                     sleep 2.5; \
                      printf '%s\\n' \"$spec missing\"; \
+                     echo done >> {quoted_log}; \
                      exit 0; \
                  fi\n\
-                 exit 1\n",
-                log.display()
+                 exit 1\n"
             ),
         )
         .unwrap();
@@ -1461,7 +1462,9 @@ exit 1
         permissions.set_mode(0o755);
         std::fs::set_permissions(&fake, permissions).unwrap();
 
-        let budget = std::time::Duration::from_millis(200);
+        // Spend over half the budget while leaving 1.5s for scheduler jitter.
+        // The completion marker below must still rule out a watchdog kill.
+        let budget = std::time::Duration::from_secs(4);
         let deadline = std::time::Instant::now() + budget;
         let err = super::blob_metadata_bounded(
             fake.to_str().unwrap(),
@@ -1476,12 +1479,10 @@ exit 1
                 .is_some(),
             "exhausted reprobe budget must return GitServiceTimeout, got: {err:#}"
         );
-        let spawns = std::fs::read_to_string(&log)
-            .map(|s| s.lines().count())
-            .unwrap_or(0);
         assert_eq!(
-            spawns, 1,
-            "a confirming probe must not be spawned when remaining budget is insufficient"
+            std::fs::read_to_string(&log).unwrap(),
+            "call\ndone\n",
+            "the first probe must finish, without spawning an unaffordable confirming probe"
         );
     }
 
