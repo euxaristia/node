@@ -1223,15 +1223,12 @@ exit 1
     #[cfg(unix)]
     #[test]
     fn bounded_file_read_does_not_capture_rejected_content() {
-        use std::os::unix::fs::PermissionsExt;
-
         let td = tempfile::TempDir::new().unwrap();
         let marker = td.path().join("content-called");
         let oid = "a".repeat(40);
-        let script = td.path().join("fakegit");
-        std::fs::write(
-            &script,
-            format!(
+        let script = write_blob_probe_fixture(
+            td.path(),
+            &format!(
                 "#!/bin/sh\n\
                  if [ \"$1\" = \"rev-parse\" ]; then echo {oid}; exit 0; fi\n\
                  if [ \"$1\" = \"cat-file\" ] && [ \"$2\" = \"--batch-check\" ]; then read spec; echo \"{oid} blob 4096\"; exit 0; fi\n\
@@ -1239,11 +1236,7 @@ exit 1
                  exit 1\n",
                 marker.display()
             ),
-        )
-        .unwrap();
-        let mut permissions = std::fs::metadata(&script).unwrap().permissions();
-        permissions.set_mode(0o755);
-        std::fs::set_permissions(&script, permissions).unwrap();
+        );
 
         let result = super::read_file_bounded(
             script.to_str().unwrap(),
@@ -1270,25 +1263,18 @@ exit 1
     #[cfg(unix)]
     #[test]
     fn bounded_file_read_caps_content_that_exceeds_preflight_size() {
-        use std::os::unix::fs::PermissionsExt;
-
         let td = tempfile::TempDir::new().unwrap();
         let oid = "b".repeat(40);
-        let script = td.path().join("fakegit");
-        std::fs::write(
-            &script,
-            format!(
+        let script = write_blob_probe_fixture(
+            td.path(),
+            &format!(
                 "#!/bin/sh\n\
                  if [ \"$1\" = \"rev-parse\" ]; then echo {oid}; exit 0; fi\n\
                  if [ \"$1\" = \"cat-file\" ] && [ \"$2\" = \"--batch-check\" ]; then read spec; echo \"{oid} blob 3\"; exit 0; fi\n\
                  if [ \"$1\" = \"cat-file\" ] && [ \"$2\" = \"blob\" ] && [ \"$3\" = \"{oid}\" ]; then printf 0123456789abcdef0123456789abcdef; exit 0; fi\n\
                  exit 1\n"
             ),
-        )
-        .unwrap();
-        let mut permissions = std::fs::metadata(&script).unwrap().permissions();
-        permissions.set_mode(0o755);
-        std::fs::set_permissions(&script, permissions).unwrap();
+        );
 
         let err = super::read_file_bounded(
             script.to_str().unwrap(),
@@ -1308,15 +1294,10 @@ exit 1
     #[cfg(unix)]
     #[test]
     fn bounded_file_read_guards_size_mismatch_and_metadata_parse() {
-        use std::os::unix::fs::PermissionsExt;
-
         let td = tempfile::TempDir::new().unwrap();
         let script = td.path().join("fakegit");
         let write_fake = |body: &str| {
-            std::fs::write(&script, body).unwrap();
-            let mut permissions = std::fs::metadata(&script).unwrap().permissions();
-            permissions.set_mode(0o755);
-            std::fs::set_permissions(&script, permissions).unwrap();
+            write_blob_probe_fixture(td.path(), body);
         };
 
         let oid = "c".repeat(40);
@@ -1434,17 +1415,14 @@ exit 1
     #[cfg(unix)]
     #[test]
     fn blob_metadata_bounded_reprobe_budget_exhaustion_returns_timeout() {
-        use std::os::unix::fs::PermissionsExt;
-
         let td = tempfile::TempDir::new().unwrap();
         let bare = td.path().join("bare.git");
         std::fs::create_dir_all(bare.join("objects/pack")).unwrap();
         let log = td.path().join("probe spawns.log");
         let quoted_log = format!("'{}'", log.display().to_string().replace('\'', "'\"'\"'"));
-        let fake = td.path().join("fakegit");
-        std::fs::write(
-            &fake,
-            format!(
+        let fake = write_blob_probe_fixture(
+            td.path(),
+            &format!(
                 "#!/bin/sh\n\
                  echo call >> {quoted_log}\n\
                  if [ \"$1\" = \"cat-file\" ] && [ \"$2\" = \"--batch-check\" ]; then \
@@ -1456,11 +1434,7 @@ exit 1
                  fi\n\
                  exit 1\n"
             ),
-        )
-        .unwrap();
-        let mut permissions = std::fs::metadata(&fake).unwrap().permissions();
-        permissions.set_mode(0o755);
-        std::fs::set_permissions(&fake, permissions).unwrap();
+        );
 
         // Spend over half the budget while leaving 1.5s for scheduler jitter.
         // The completion marker below must still rule out a watchdog kill.
