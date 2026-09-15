@@ -975,9 +975,27 @@ mod tests {
 
         assert_eq!(git_config(&dest, "remote.origin.promisor"), "true");
         assert_eq!(git_config(&dest, "remote.origin.mirror"), "true");
+        #[cfg(windows)]
+        assert_eq!(
+            git_config(&dest, "remote.origin.partialclonefilter"),
+            PROMISOR_BLOB_FILTER
+        );
+        #[cfg(not(windows))]
+        assert_eq!(
+            git_config(&dest, "remote.origin.partialclonefilter"),
+            "blob:limit=10737418240"
+        );
         // No withholding on a plain bare origin, so every object is present:
         // 1 commit + 1 root tree + 2 subtrees + 2 blobs = 6.
         assert_eq!(object_count(&dest), 6);
+    }
+
+    #[test]
+    fn promisor_blob_filter_matches_platform_limit() {
+        #[cfg(windows)]
+        assert_eq!(PROMISOR_BLOB_FILTER, "blob:limit=4294967295");
+        #[cfg(not(windows))]
+        assert_eq!(PROMISOR_BLOB_FILTER, "blob:limit=10g");
     }
 
     #[tokio::test]
