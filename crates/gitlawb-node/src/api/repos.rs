@@ -4345,12 +4345,21 @@ mod tests {
 
     #[cfg(unix)]
     fn write_fake_git(dir: &std::path::Path, body: &str) -> String {
-        use std::os::unix::fs::PermissionsExt;
+        use std::io::Write;
         let p = dir.join("fakegit");
-        std::fs::write(&p, body).unwrap();
-        let mut perm = std::fs::metadata(&p).unwrap().permissions();
-        perm.set_mode(0o755);
-        std::fs::set_permissions(&p, perm).unwrap();
+        let mut writer = std::process::Command::new("sh")
+            .args(["-c", "cat > \"$1\" && chmod 755 \"$1\"", "fixture-writer"])
+            .arg(&p)
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        writer
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(body.as_bytes())
+            .unwrap();
+        assert!(writer.wait().unwrap().success());
         p.to_str().unwrap().to_string()
     }
 

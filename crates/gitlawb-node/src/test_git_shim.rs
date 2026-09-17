@@ -59,7 +59,8 @@ pub(super) fn create(name: &str, behavior: Behavior<'_>) -> GitShim {
         .expect("Git fixture instance");
     let file_name = format!("git-shim{}", std::env::consts::EXE_SUFFIX);
     let executable = directory.path().join(&file_name);
-    std::fs::copy(compiled.path().join(file_name), &executable).expect("copy native Git fixture");
+    std::fs::hard_link(compiled.path().join(file_name), &executable)
+        .expect("hard link native Git fixture");
     let config = match behavior {
         Behavior::Delay(milliseconds) => format!("delay\n{milliseconds}"),
         Behavior::Hang => "hang\n".to_owned(),
