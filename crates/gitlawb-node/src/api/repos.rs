@@ -547,10 +547,17 @@ pub async fn get_blob(
 
     let caller = auth.as_ref().map(|e| e.0 .0.as_str());
     let gate_path = format!("/{file_path}");
-    let (record, _rules) =
-        crate::api::authorize_repo_read(&state, &owner, &name, caller, &gate_path).await?;
-
     let acquire_deadline = std::time::Duration::from_secs(state.config.git_acquire_timeout_secs);
+    let (record, _rules) = tokio::time::timeout(
+        acquire_deadline,
+        crate::api::authorize_repo_read(&state, &owner, &name, caller, &gate_path),
+    )
+    .await
+    .map_err(|_elapsed| {
+        tracing::warn!(repo = %name, "repo authorization timed out; shedding blob request with 503");
+        AppError::Overloaded("git service acquisition timed out, retry shortly".into())
+    })??;
+
     let disk_path = tokio::time::timeout(
         acquire_deadline,
         state.repo_store.acquire(&record.owner_did, &record.name),
@@ -4125,6 +4132,46 @@ mod tests {
         assert_eq!(state.git_read_per_caller.tracked_keys(), 0);
     }
 
+    #[sqlx::test]
+    async fn blob_route_authorization_timeout_sheds_503_and_releases_permits(pool: sqlx::PgPool) {
+        use axum::http::StatusCode;
+        use http_body_util::BodyExt;
+
+        let mut state = crate::test_support::test_state(pool.clone()).await;
+        state.push_limiter_trust = crate::rate_limit::TrustedProxy::None;
+        let mut cfg = (*state.config).clone();
+        cfg.git_acquire_timeout_secs = 1;
+        state.config = Arc::new(cfg);
+
+        // Hold an exclusive lock on `repos` on a separate connection so `get_repo` blocks.
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query("LOCK TABLE repos IN ACCESS EXCLUSIVE MODE")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+
+        let response = blob_route_request_path(
+            state.clone(),
+            "z6blobauthztimeout",
+            "file.txt",
+            "203.0.113.31:5000",
+        )
+        .await;
+
+        tx.rollback().await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["error"], "overloaded");
+        assert_eq!(state.git_read_semaphore.available_permits(), 64);
+        assert_eq!(
+            state.git_blob_semaphore.available_permits(),
+            MAX_CONCURRENT_BLOB_READS
+        );
+        assert_eq!(state.git_read_per_caller.tracked_keys(), 0);
+    }
+
     #[cfg(unix)]
     #[sqlx::test]
     async fn blob_route_returns_200_with_expected_headers_and_content(pool: sqlx::PgPool) {
@@ -4347,6 +4394,8 @@ mod tests {
     fn write_fake_git(dir: &std::path::Path, body: &str) -> String {
         use std::io::Write;
         let p = dir.join("fakegit");
+        // Write in a child so parallel tests cannot inherit an open writable
+        // script descriptor when they fork (which would cause ETXTBSY).
         let mut writer = std::process::Command::new("sh")
             .args(["-c", "cat > \"$1\" && chmod 755 \"$1\"", "fixture-writer"])
             .arg(&p)
