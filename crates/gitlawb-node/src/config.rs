@@ -234,11 +234,13 @@ pub struct Config {
     /// bounds `RepoStore::{acquire,acquire_fresh,acquire_write}` — the Tigris
     /// HEAD/GET on a read/advert acquire and the advisory-lock retry loop (incl. a
     /// per-iteration `pg_try_advisory_lock` that can block on a hung Postgres pool)
-    /// on a write acquire. A concurrency permit is taken BEFORE this phase, and
-    /// `git_service_timeout_secs` only starts once git spawns, so without this the
-    /// acquire phase is unbounded: a stalled backend pins the permit and drains the
-    /// pool until every later request 503s. On expiry the permit is released and a
-    /// bounded 503 + Retry-After is returned (fail-closed). Kept separate from
+    /// on a write acquire. For REST blob reads, it also independently bounds the
+    /// preceding PostgreSQL authorization wait. A concurrency permit is taken
+    /// BEFORE this phase, and `git_service_timeout_secs` only starts once git
+    /// spawns, so without this the acquire phase is unbounded: a stalled backend
+    /// pins the permit and drains the pool until every later request 503s.
+    /// On expiry the permit is released and a bounded 503 + Retry-After is
+    /// returned (fail-closed). Kept separate from
     /// `git_service_timeout_secs` because acquisition and git execution are distinct
     /// cost centers — one shared budget would let a slow acquire starve git. Must be
     /// positive; set it very large to effectively disable the bound. Default: 30s.
