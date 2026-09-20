@@ -4150,17 +4150,22 @@ mod tests {
             .await
             .unwrap();
 
-        let response = blob_route_request_path(
-            state.clone(),
-            "z6blobauthztimeout",
-            "file.txt",
-            "203.0.113.31:5000",
+        let response = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            blob_route_request_path(
+                state.clone(),
+                "z6blobauthztimeout",
+                "file.txt",
+                "203.0.113.31:5000",
+            ),
         )
-        .await;
+        .await
+        .expect("the configured authorization deadline must shed the blocked request");
 
         tx.rollback().await.unwrap();
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()[axum::http::header::RETRY_AFTER], "1");
         let bytes = response.into_body().collect().await.unwrap().to_bytes();
         let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(body["error"], "overloaded");
